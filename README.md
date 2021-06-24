@@ -12,6 +12,7 @@ The scripts in this repository assume that the code of the estimation pipeline i
 ## Estimate stability
 - bootstrap_feathers.R is used to generate Fig. 2, it uses a data-file called `all_bootstrap_estimates.csv' which contains the outcome of our Re estimation pipeline on 7 months of daily data files for Switzerland.
 - aggregate_bootstrap_estimates.R was included for transparency as it is the file we use to generate `all_bootstrap_estimates.csv' from the individual estimate files.
+- ReCountryCluster.R was similarly included for transparency as it is used to estimate Re from each individual incidence data file. This is analogue to the ReCountry.R script used in the [general pipeline](https://github.com/covid-19-Re/shiny-dailyRe), but adapted to accept different incidence data files.
 
 ## Dashboard
 - Fig. 3 was taken from [our dashboard](https://ibz-shiny.ethz.ch/covid-19-re-international/).
@@ -21,5 +22,5 @@ The scripts in this repository assume that the code of the estimation pipeline i
 - Fig4.R is used to generate Figs. 4 and S12.
 
 ## Currently not included
-- The code to generate figures S9-S11 is currently not included since it requires access to Swiss linelist data to run.
+- Status 24.6: The code to generate figures S9-S11 is currently not included since it requires access to Swiss linelist data to run. We are working to provide a processed form of the data and the corresponding scripts for transparency.
 
