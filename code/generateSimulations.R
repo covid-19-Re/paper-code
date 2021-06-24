@@ -3,8 +3,7 @@
 ## author: J.S. Huisman; some functions by Jinzhou Li
 ###########################################################
 
-#plot_path = '/Users/jana/Documents/PhD/covid/Re_project/figures'
-appDir = "/Users/jana/Documents/PhD/covid/covid-19-re-shiny-app"
+appDir = "../../covid-19-re-shiny-app"
 
 library("fitdistrplus")
 library(tidyverse)
@@ -51,6 +50,7 @@ getReTS <- function(shift_times, R_levels){
   return(ReTS)
 }
 
+## USAGE
 # shift_times = c(0, 30, 40, 50, 60, 80)
 # R_levels = c(4, 0.5, 1.2)
 # ReTS <- getReTS(shift_times, R_levels)
@@ -104,13 +104,7 @@ getInfectionsDayT <- function(RT, InfectionsBeforeT, DiscreteSerialInterval, mig
   InfectionsDayT = rpois(1, LambdaDayT)
   if(is.na(InfectionsDayT)){
     InfectionsDayT = 0
-    #print(paste0('error for ', LambdaDayT))
-    # happens occassionally for very small negative values (numerical error)
   }
-  
-  # if (migration & (runif(1, min = 0, max = 1) < 0.01)){
-  #   InfectionsDayT = InfectionsDayT + 1
-  # }
   
   return(InfectionsDayT)
 }
@@ -139,6 +133,7 @@ getInfectionTS <- function(ReTS, init_infection = 1, ...){
   return(infectionTS)
 }
 
+## USAGE
 # infectionTS <- getInfectionTS(ReTS)
 # plot(infectionTS)
 
@@ -163,27 +158,6 @@ drawDoubleGamma <- function(n_draws, IncubationParams, OnsetToCountParams){
              scale = IncubationParams$scale))
   return(draws)
 }
-
-#library(actuar)
-# makeGammaECDF <- function(GammaParams1, GammaParams2, numberOfSamples = 1E6) {
-#   draws <- rgamma(numberOfSamples, shape = GammaParams1$shape, scale = GammaParams1$scale) +
-#     rgamma(numberOfSamples, shape = GammaParams2$shape, scale = GammaParams2$scale)
-#   return(Vectorize(ecdf(draws)))
-# }
-
-# drawDoubleGamma <- function(n_draws, IncubationParams, OnsetToCountParams){
-#   Fhat <- makeGammaECDF(IncubationParams, OnsetToCountParams)
-#   
-#   # the first entry corresponds to delay = 0
-#   discrete_double_gamma <- discretize(Fhat, method = "upper",
-#                                       from = -0.5, to = 101, step = 1)
-#   
-#   draws = sample(x = 0:100, size = n_draws, replace = TRUE, prob = discrete_double_gamma)
-#   
-#   return(draws)
-# }
-
-
 
 addTSnoise <- function(observationTS, noise){
   origObsTS <- observationTS
@@ -241,31 +215,6 @@ addTSnoise <- function(observationTS, noise){
 }
 
 
-# timevaryingDelayDist <- function(incidenceOnDay, OnsetToCountParams,
-#                                  first = 1.2, second = 1.5){
-#   
-#   invParams = getInvGammaParams(shapeParam = OnsetToCountParams$shape, 
-#                     scaleParam = OnsetToCountParams$scale)
-#   
-#   # if (incidenceOnDay > 1000){
-#   #   #mean is 1.2 times greater
-#   #   NewOnsetToCountParams = list(shape = (first^2)*OnsetToCountParams$shape, 
-#   #                                scale = OnsetToCountParams$scale/first)
-#   # } else if (incidenceOnDay > 10000){
-#   #   NewOnsetToCountParams = list(shape = (second^2)*OnsetToCountParams$shape, 
-#   #                                scale = OnsetToCountParams$scale/second)
-#   # } else{
-#   #   NewOnsetToCountParams <- OnsetToCountParams
-#   # }
-#   
-#   # 2 days longer processing time at 10000 cases
-#   newMean = invParams$mean + 2e-04*incidenceOnDay
-#   
-#   NewOnsetToCountParams <- getGammaParams(newMean, invParams$sd)
-#   
-#   return(NewOnsetToCountParams)
-# }
-
 timevaryingDelayDist <- function(onset_date, OnsetToCountParams){
   
   invParams = getInvGammaParams(shapeParam = OnsetToCountParams$shape, 
@@ -292,7 +241,7 @@ getObservationTS <- function(infectionTS, IncubationParams, OnsetToCountParams,
 
   n_infect_tot <- sum(infectionTS)
   ObservationDates <- c()
-  #infection_date = 1
+
   for (infection_date in 1:n_ts) {
      
     if (infectionTS[infection_date] > 0){
@@ -328,26 +277,8 @@ getObservationTS <- function(infectionTS, IncubationParams, OnsetToCountParams,
   observationTS <- unname( table( c(ObservationDates, allObservationDates) ) ) -1
   observationTS <- as.numeric(observationTS)
   
-  # observationTS <- c()
-  # for(i in 1:length(allObservationDates)) {
-  #   observationTS[i] <- sum(ObservationDates == allObservationDates[i])
-  # }
-
-  #origObsTS <- observationTS
-  
-  #observationTS <- addTSnoise(observationTS, noise)
   observationTS_cut <- observationTS[1:length(infectionTS)]
   observationTS <- addTSnoise(observationTS_cut, noise)
-  
-  #Cut-off the timeseries a bit earlier than the last observation
-  # if (truncate == 'empirical'){
-  #   delay_sample <- drawDoubleGamma(10000,
-  #                                   IncubationParams,
-  #                                   OnsetToCountParams)
-  #   extension = min(n_ts + median(delay_sample), length(origObsTS))
-  #   observationTS = observationTS[1:extension]
-  # }
-
   
   return(observationTS)
 }
@@ -357,7 +288,6 @@ getEmpCountDelayDist <- function(infectionTS, IncubationParams, OnsetToCountPara
                                  subsample = 0.4){
   n_ts = length(infectionTS)
   
-  #delays_data_path <- "/Users/jana/Documents/PhD/covid/covid-19-re-shiny-app/app/data/CH/FOPH_data_delays.csv"
   delay_df <- data.frame()
   for (infection_date in 1:n_ts) {
     
@@ -398,7 +328,7 @@ getEmpCountDelayDist <- function(infectionTS, IncubationParams, OnsetToCountPara
   return(delay_df)
 }
 
-
+## USAGE
 # IncubationParams <- getGammaParams(meanParam = 5.3, sdParam = 3.2)
 # # onset to death: mean =15.0 sd=6.9 (Linton et al. best gamma distr fit)
 # OnsetToCountParams = getGammaParams(15.0, 6.9)
@@ -437,6 +367,7 @@ simulateTS <- function(shift_times, R_levels,
   return(result)
 }
 
+## USAGE
 # simulation <- simulateTS(t, R,
 #           IncubationParams, OnsetToCountParams, init_infection = 1000)
 # 
@@ -483,8 +414,6 @@ get_infection_incidence_by_shift <- function(
   if(is_empirical) {
     delay_dist_matrix <- get_matrix_empirical_waiting_time_distr(
       empirical_delays, seq(min(data_subset$date)-24, max(data_subset$date), by = "days") )
-    
-    #lapply(1:ncol(delay_dist_matrix), function(x){which.max(delay_dist_matrix[, x]) - 1})
     
     # this should be improved! now it is not different for every shift
     n_shift = which.max(delay_dist_matrix[, 1])  - 1
@@ -640,317 +569,3 @@ cleanReTSestimate <- function(rawEstimatedRe){
 }
 
 #estimatedRe <- estimateReTS(estimatedInfections, delay = 0)
-
-###########################################################
-
-# getSimulationResults <- function(shift_times, R_levels, 
-#                                  IncubationParams, OnsetToCountParams,
-#                                  smooth_param = TRUE, delay = 0){
-#   # Simulate and Estimate
-#   simulation <- simulateTS(shift_times, R_levels,
-#                            IncubationParams, OnsetToCountParams)
-#   estimatedInfections <- estimateInfectionTS(simulation, IncubationParams, 
-#                                              OnsetToCountParams,
-#                                              smooth_param) 
-#   estimatedRe <- estimateReTS(estimatedInfections, delay)
-#   
-#   return(list(simulation = simulation,
-#               estimatedInfections = estimatedInfections,
-#               estimatedRe = estimatedRe))
-# }
-######################################################################################################################
-###### Compare Simulation and Estimation results ######
-
-# getReRMSE <- function(ReCompare){
-#   ReCompare <- ReCompare %>%
-#     #mutate(SE = (Re - median_R_mean)^2)
-#     mutate(SE = ( median_R_mean - Re)^2)
-#   
-#   rmse <- sqrt(sum(ReCompare$SE)/length(ReCompare$SE))
-#   norm_rmse <- rmse / mean(ReCompare$Re)
-#   #return(rmse)
-#   return(norm_rmse)
-# }
-# 
-# getRelError <- function(ReCompare){
-#   ReCompare <- ReCompare %>%
-#     filter(Re != 0 ) %>%
-#     mutate(rel_err = (Re - median_R_mean)/Re)
-#   
-#   rel_err <- mean(ReCompare$rel_err)
-#   return(rel_err)
-# }
-# 
-# # getRootDiff <- function(ReCompare, timewindow = NULL){
-# #   if(is.null(timewindow)){
-# #     timewindow = min(which(diff(ReCompare$Re) != 0)):length(ReCompare$date)
-# #   }
-# #   
-# #   sim_root <- ReCompare$date[timewindow][min(which(ReCompare$Re[timewindow] < 1))]
-# #   est_root <- ReCompare$date[timewindow][min(which(ReCompare$median_R_mean[timewindow] < 1))]
-# #   
-# #   root_diff <- as.numeric(est_root - sim_root)
-# #   return(root_diff)
-# # }
-# 
-# getRootDiff <- function(simulation, estimatedRe, all = FALSE){
-# 
-#   sim_change_points = diff(sign(simulation$Re -1))  
-#   sim_roots = simulation$date[which(sim_change_points != 0 )]
-# 
-#   if (! ('median_R_mean' %in% colnames(estimatedRe))){
-#     estimatedRe <- cleanReTSestimate(estimatedRe)
-#   }
-#   
-#   est_change_points = diff(sign(estimatedRe$median_R_mean -1))  
-#   est_roots = estimatedRe$date[which(est_change_points != 0 )]
-#   
-#   root_diffs <- as.numeric(est_roots - sim_roots)
-#   
-#   if (all){
-#     root_diff = sum(abs(root_diffs))
-#   } else{
-#     root_diff = root_diffs[1]
-#   }
-#   return( root_diff )
-# }
-# 
-# getEmpCoverage <- function(ReCompare){
-#   covCompare <- ReCompare %>%
-#     mutate(coverage = (Re >= median_R_lowHPD) & (Re <= median_R_highHPD) ,
-#            CI_width = median_R_highHPD - median_R_lowHPD)
-# 
-#   frac_coverage <- sum(covCompare$coverage)/nrow(covCompare)
-#   median_CI_width <- median(covCompare$CI_width)
-#   
-#   return(list(frac_coverage = frac_coverage, CI_width = median_CI_width))
-# }
-# 
-# library(dtwclust)
-# library(SimilarityMeasures)
-# 
-# getReTSdist <- function(ReCompare, Fdist = FALSE){
-#   Re_est_ts <- ts(ReCompare %>% pull(median_R_mean), start = min(ReCompare$date), end = max(ReCompare$date))
-#   Re_sim_ts <- ts(ReCompare %>% pull(Re), start = min(ReCompare$date), end = max(ReCompare$date))
-#   
-#   DTWdist <- dtw(Re_sim_ts, Re_est_ts, distance.only = TRUE)$normalizedDistance
-#   
-#   if(!Fdist){
-#     return(list(DTWdist = DTWdist))
-#   } else {
-#     FrechetDist <- Frechet(matrix(ReCompare %>% pull(median_R_mean)), 
-#                            matrix(ReCompare %>% pull(Re)))
-#     
-#     return(list(DTWdist = DTWdist, Fdist = FrechetDist))
-#   }
-#   
-# }
-# 
-# getReError <- function(simulation, estimatedRe, Fdist = FALSE){
-#   
-#   if (! ('median_R_mean' %in% colnames(estimatedRe))){
-#     estimatedRe <- cleanReTSestimate(estimatedRe)
-#   }
-#   
-#   #Compare
-#   ReCompare <- simulation %>%
-#     full_join(estimatedRe, by = c('date')) %>%
-#     filter(!is.na(median_R_mean))
-#   
-#   ReRMSE <- getReRMSE(ReCompare)
-#   RelError <- getRelError(ReCompare)
-#   RootDiff <- getRootDiff(simulation, estimatedRe, all = FALSE)
-#   EmpCoverage <- getEmpCoverage(ReCompare)
-#   ReTSdist <- getReTSdist(ReCompare, Fdist)
-#   OneTrans <- getOneTransitions(simulation, estimatedRe)
-#   
-#   if (!Fdist){
-#     return(list(ReRMSE = ReRMSE, RelError = RelError, RootDiff = RootDiff, 
-#                 EmpCoverage = EmpCoverage$frac_coverage,
-#                 CIWidth = EmpCoverage$CI_width,
-#                 OneTrans = OneTrans,
-#                 DTWdist = ReTSdist$DTWdist))
-#   } else {
-#     return(list(ReRMSE = ReRMSE, RelError = RelError, RootDiff = RootDiff, 
-#                 EmpCoverage = EmpCoverage$frac_coverage,
-#                 CIWidth = EmpCoverage$CI_width,
-#                 OneTrans = OneTrans,
-#                 DTWdist = ReTSdist$DTWdist,
-#                 Fdist = ReTSdist$Fdist))
-#   }
-#  
-# }
-#  
-# 
-# getSlopeError <- function(simulation, estimatedRe, valid_cond){
-#   date_t3 = simulation$date[valid_cond$t3]
-#   date_t2 = simulation$date[valid_cond$t2]
-#   date_first = max(min(estimatedRe$date), date_t2)
-#   date_int = as.numeric(date_t3 - date_first)
-#   
-#   slope_sim = (simulation$Re[simulation$date == date_t3] -
-#                  simulation$Re[simulation$date == date_first])/date_int
-#   
-#   meanEstRe <- estimatedRe %>%
-#     filter(variable == 'R_mean') %>%
-#     dplyr::select(date, replicate, value) %>%
-#     group_by(replicate) %>%
-#     summarise(slope_est = (value[date == date_t3] -
-#                              value[date == date_first])/date_int,
-#               .groups = "drop")
-#   
-#   abs_slope_error = slope_sim - meanEstRe$slope_est
-#   rel_slope_error = (abs_slope_error/slope_sim)
-#   #return(abs_slope_error)
-#   return(rel_slope_error)
-# }
-# 
-# 
-# getMeanSlopeError <- function(valid_cond_grid){
-#   SlopeError = data.frame()
-#   for (row_id in 1:nrow(valid_cond_grid)){
-#     
-#     simulation <- read_csv(paste0(valid_cond_grid[row_id, 'simulationDir'], '/', 
-#                                   valid_cond_grid[row_id, 'filename']))
-#     
-#     estimatedInfections <- read_csv(paste0(valid_cond_grid[row_id, 'estimationDir'],
-#                                            valid_cond_grid[row_id, 'infection_file']))
-#     
-#     estimatedRe <- read_csv(paste0(valid_cond_grid[row_id, 'estimationDir'], 
-#                                    valid_cond_grid[row_id, 're_file']))
-#     
-#     new_error <- getSlopeError(simulation, estimatedRe, valid_cond_grid[row_id, ])
-#     SlopeError <- bind_rows(SlopeError, list(slopeError = mean(new_error)) )
-#   }
-#   return(SlopeError)
-# }
-# 
-# 
-# getOneTransitions <- function(simulation, estimatedRe){
-#   simulation <- simulation %>%
-#     mutate(OneTrans = ifelse(Re >= 1, 1, 0))
-#   
-#   if (! ('median_R_mean' %in% colnames(estimatedRe))){
-#     estimatedRe <- cleanReTSestimate(estimatedRe)
-#   }
-#   
-#   one_transitions = estimatedRe %>%
-#     mutate(EstOneTrans = case_when(median_R_lowHPD >= 1 ~ 1,
-#                                     median_R_highHPD < 1 ~ 0)) %>%
-#     full_join(simulation, by = c('date')) %>%
-#     dplyr::select(date, Re, OneTrans, EstOneTrans) %>%
-#     filter(!is.na(EstOneTrans)) %>%
-#     mutate(compare = OneTrans == EstOneTrans)
-#   
-#   perc_transitions = sum(one_transitions$compare)/nrow(one_transitions)
-#     
-#   return(perc_transitions)
-# }
-# 
-# 
-# ###### Investigate Bootstrap Residuals ######
-# plotBootstrapResid <- function(simulation, estimatedRe){
-#   sim_subset <- simulation %>%
-#     dplyr::select(-c(infections, observations))
-#   
-#   est_subset <- estimatedRe %>%
-#     filter(variable == 'R_mean') %>%
-#     dplyr::select(date, replicate, Re_est = value) %>%
-#     left_join(sim_subset, by = 'date') %>%
-#     mutate(resid = sqrt(nrow(.))*(Re_est - Re) )
-# 
-#   first_boot_set <- estimatedRe %>%
-#     filter(variable == 'R_mean',
-#            replicate == 0) %>%
-#     dplyr::select(date, first_boot = value)
-#   
-#   boot_set <- estimatedRe %>%
-#     filter(variable == 'R_mean',
-#            replicate != 0) %>%
-#     dplyr::select(date, replicate, value) %>%
-#     left_join(first_boot_set, by = 'date') %>%
-#     mutate(resid = sqrt(nrow(.))*(value - first_boot) )
-#   
-#   p <- ggplot() +
-#     geom_histogram(data = boot_set,
-#                    aes(resid, stat(density)), binwidth = 1, alpha = 0.4, fill = 'black') +
-#   geom_histogram(data = est_subset,
-#                     aes(resid, stat(density)), binwidth = 1, alpha = 0.4, fill = 'lightblue')
-#   return(p)
-# }
-# 
-# checkBootstrapNormal <- function(simulation, estimatedRe){
-#   sim_subset <- simulation %>%
-#     dplyr::select(-c(infections, observations))
-#   
-#   est_subset <- estimatedRe %>%
-#     filter(variable == 'R_mean') %>%
-#     dplyr::select(date, replicate, Re_est = value) %>%
-#     left_join(sim_subset, by = 'date') %>%
-#     mutate(resid = sqrt(nrow(.))*(Re_est - Re) )
-# 
-#   
-#   first_boot_set <- estimatedRe %>%
-#     filter(variable == 'R_mean',
-#            replicate == 0) %>%
-#     dplyr::select(date, first_boot = value)
-#   
-#   boot_set <- estimatedRe %>%
-#     filter(variable == 'R_mean',
-#            replicate != 0) %>%
-#     dplyr::select(date, replicate, value) %>%
-#     left_join(first_boot_set, by = 'date') %>%
-#     mutate(resid = sqrt(nrow(.))*(value - first_boot) )
-#   
-#   
-#   relevant_dates <- est_subset %>%
-#     group_by(date) %>%
-#     count() %>%
-#     filter(n > 10) %>%
-#     pull(date)
-#   
-#   get_pval <- function(date_id){shapiro.test(est_subset %>% filter(date == date_id) %>% pull(resid))$p.value}
-#   
-#   p_vals <- sapply(relevant_dates, get_pval )
-#   # p-value below 0.05 indicates not normal  
-#   frac_normal = sum(p_vals > 0.05)/length(p_vals)
-#   dates_not_normal = relevant_dates[which(p_vals <= 0.05)]
-#   
-#   if (length(est_subset %>% pull(resid)) < 3){
-#     overall_normal = 0
-#   } else if (length(est_subset %>% pull(resid)) > 5000) {
-#     resid = est_subset %>% pull(resid)
-#     overall_normal = shapiro.test(resid[1:5000])$p.value > 0.05 
-#   } else {
-#     overall_normal = shapiro.test(est_subset %>% pull(resid))$p.value > 0.05 
-#   }
-#   
-#   return(list(frac_normal = frac_normal, # dates_not_normal = dates_not_normal,
-#               overall_normal = overall_normal))
-# }
-# 
-# ###### Infection Incidence Estimation Error ######
-# 
-# getInfectionCoverage <- function(simulation, estimatedInfections){
-#   
-#   InfectCompare <- estimatedInfections %>%
-#     dplyr::select(-c(country, region, source, data_type, variable)) %>%
-#     group_by(date) %>%
-#     summarize(
-#       median_val = median(value),
-#       high_quant = quantile(value, probs=0.975, na.rm=T),
-#       low_quant = quantile(value, probs=0.025, na.rm=T),
-#       .groups = "keep"
-#     ) %>%
-#     ungroup() %>%
-#     full_join(simulation, by = c('date')) %>%
-#     filter(!is.na(infections) & !is.na(median_val)) %>%
-#     dplyr::select(-c(Re, observations)) %>%
-#     mutate(coverage = (infections >= low_quant) & (infections <= high_quant) ,
-#            CI_width = high_quant - low_quant )
-#   
-#   frac_coverage <- sum(InfectCompare$coverage)/nrow(InfectCompare)
-#   median_CI_width <- median(InfectCompare$CI_width)
-#   
-#   return(list(frac_coverage = frac_coverage, CI_width = median_CI_width))
-# }
