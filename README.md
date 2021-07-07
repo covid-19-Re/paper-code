@@ -21,6 +21,6 @@ The scripts in this repository assume that the code of the estimation pipeline i
 - empiricalPaper.R is used to generate Table 1 and S2.
 - Fig4.R is used to generate Figs. 4 and S12.
 
-## Currently not included
-- Status 24.6: The code to generate figures S9-S11 is currently not included since it requires access to Swiss linelist data to run. We are working to provide a processed form of the data and the corresponding scripts for transparency.
+## Figures S9-S11
+- The code to generate figures S9-S11 requires access to Swiss linelist data to run. We provide the data that is plotted in the paper (in the data folder) and the scripts used to analyse the raw data (in the code folder). The latter will not be able to run without the privacy-sensitive data, but is included for transparency.
 
