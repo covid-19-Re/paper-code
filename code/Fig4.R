@@ -25,9 +25,26 @@ countries = unique(ReEstimates$estimates$countryIso3)
 length(countries)
 
 ###########################################################
-url = 'https://raw.githubusercontent.com/OxCGRT/covid-policy-tracker/master/data/OxCGRT_latest.csv'
 
-oxfordGRT <- read_csv(url, 
+mobData <- qread('../data/allMobilityDataGoogle.qs')
+
+mob_df <- mobData %>%
+  mutate(week = isoweek(date),
+         year = year(date)) %>%
+  group_by(countryIso3, region, data_type, week, year) %>%
+  summarise(mob_value = mean(change),
+            date = max(date),
+            .groups = 'drop') %>%
+  arrange(countryIso3, date, data_type)
+
+# ggplot(mobData %>% filter(countryIso3 == 'NLD')) +
+#   geom_point(aes(x = date, y = change)) +
+#   facet_wrap(vars(data_type))
+
+###########################################################
+#url = 'https://raw.githubusercontent.com/OxCGRT/covid-policy-tracker/master/data/OxCGRT_latest.csv'
+
+oxfordGRT <- read_csv('../data/oxfordGRT.csv', #url, 
                       col_types = cols('Date' = col_character(),
                                        'RegionName' = col_character(),
                                        'RegionCode'= col_character()))
@@ -52,6 +69,197 @@ cleanRe <- ReEstimates$estimates %>%
   mutate(country = ifelse(!is.na(country.y), country.y, country.x) ) %>%
   dplyr::select(-country.x, - country.y)
 
+
+## THE SI index #####
+SI_df <- oxfordGRT %>%
+  filter(is.na(RegionCode)) %>%
+  mutate(date = parse_date(Date, format = "%Y%m%d"),
+         week = isoweek(date),
+         year = year(date)) %>%
+  dplyr::select(c(country = CountryName, 
+                  countryIso3 = CountryCode,
+                  date, week, year, 
+                  SI_index = StringencyIndexForDisplay)) %>%
+  group_by(country, countryIso3) %>%
+  mutate(SI_diff = SI_index - lag(SI_index, 1)) %>%
+  group_by(country, countryIso3, week, year) %>%
+  summarise(SI_diff = sum(SI_diff, na.rm = T),
+            SI_value = SI_index[which.max(date)],
+            date = max(date),
+            .groups = 'drop')
+
+SI_effects <- cleanRe %>%
+  mutate(Rlead7 = lead(R, 7) - R,
+         Rpast7 = R - lag(R, 7),
+         Rlead14 = lead(R, 14) - R) %>%
+  right_join(SI_df, by = c('countryIso3', 'date')) %>%
+  mutate(country = ifelse(!is.na(country.y), country.y, country.x) ) %>%
+  dplyr::select(-country.x, - country.y) %>%
+  mutate(#roundR7 = round(Rlead7, digits = 1),
+         #roundRpast7 = round(Rpast7, digits = 1),
+         #roundR14 = round(Rlead14, digits = 1),
+         #signCdiff = factor(sign(SI_diff), levels = c(-1, 0, 1)),
+         dummy = 1,
+         roundSI = round(SI_diff, digits = -1)) %>%
+  filter(!is.na(continent))
+
+plotSI <- SI_effects %>% 
+  filter(!is.na(countryIso3)) %>%
+  pivot_longer(c('Rlead7', 'Rpast7', 'Rlead14'), names_to = 'R_var', values_to = 'R_val') %>%
+  mutate(R_var = factor(R_var, levels = c('Rpast7', 'Rlead7', 'Rlead14'),
+                        labels = c('R(t)', 'R(t+7)', 'R(t+14)'))) %>%
+  group_by(continent, roundSI, R_var) %>%
+  summarise(Rmed = median(R_val, na.rm = T),
+            R_low = quantile(R_val, 0.25, na.rm = T),
+            R_high = quantile(R_val, 0.75, na.rm = T))
+
+###########################################################
+## NPI abolishment/implementation #####
+
+SI_plot <- ggplot(plotSI) +
+  # geom_violin(aes(x = R_val, y = roundSI, group = interaction(roundSI, R_var), colour = R_var),
+  #             draw_quantiles = c(0.5),
+  #             show.legend = T, orientation = 'y') +
+  geom_errorbar(aes(xmin = R_low, xmax = R_high, y = roundSI, colour = R_var),
+               show.legend = T, orientation = 'y') +
+  geom_point(aes(x = Rmed, y = roundSI, colour = R_var), show.legend = T) +
+  coord_cartesian(xlim = c(-1, 1), ylim = c(-50, 50)) +
+  scale_colour_manual(values = viridis(4)[1:3])+
+  geom_vline(aes(xintercept = 0), colour = 'black', size = 0.5) +
+  geom_hline(aes(yintercept = 0), colour = 'black', size = 0.5) +
+  facet_grid(cols = vars(continent), rows = vars(R_var), scale = 'free') +
+  labs(y = 'Change in SI', x = 'Change in Re', 
+       colour = 'Change in Re') +
+  theme_minimal() +
+  theme(legend.position = 'bottom',
+    axis.text.y= element_text(size=17),
+        axis.text.x= element_text(size=17, angle = 45, hjust = 1, vjust = 1),
+        strip.text =  element_text(size=20), #, angle = 0
+        panel.spacing.y = unit(0.75, "lines"),
+        axis.title.y =  element_text(size=20),
+        axis.title.x =  element_text(size=20),
+        legend.title = element_text(size=20),
+        legend.text = element_text(size=17)
+  )
+SI_plot
+
+plotPath <- paste0(plot_path, '/SIdiff_Rediff_distribution_country_SI_diff.pdf')
+ggsave(plotPath, width = 17, height = 10)
+#ggsave(plotPath, plot = p, width = 12, height = 8)
+
+###########################################################
+plotMob <- cleanRe %>%
+  mutate(Rpast7 = R - lag(R, 7),
+         Rlead7 = lead(R, 7) - R,
+         Rlead14 = lead(R, 14) - R) %>%
+  right_join(mob_df, by = c('countryIso3', 'date')) %>%
+  mutate(roundMob = round(mob_value, digits = -1)) %>%
+  filter(!is.na(continent), 
+         !is.na(countryIso3),
+         date <= as_date('2021-05-03')) %>%
+  pivot_longer(c('Rlead7', 'Rpast7', 'Rlead14'), names_to = 'R_var', values_to = 'R_val') %>%
+  mutate(R_var = factor(R_var, levels = c('Rpast7', 'Rlead7', 'Rlead14'),
+                        labels = c('R(t)', 'R(t+7)', 'R(t+14)'))) %>%
+  group_by(continent, data_type, roundMob, R_var) %>%
+  summarise(Rmed = median(R_val, na.rm = T),
+            R_low = quantile(R_val, 0.25, na.rm = T),
+            R_high = quantile(R_val, 0.75, na.rm = T)) %>%
+  mutate(data_type = factor(data_type, levels = c("Grocery And Pharmacy","Parks", 
+                          "Residential", "Retail And Recreation", "Transit Stations","Workplaces" ),
+                          labels = c("Grocery", "Parks", "Residential", 
+                                     "Retail And Rec.", "Transit","Workplaces" ))) %>%
+  filter(R_var == 'R(t)')
+
+Mob_plot <- ggplot(plotMob %>% filter(continent == 'Europe')) +
+  #ggplot(plotMob %>% filter(data_type %in% c('Grocery', 'Residential', 'Workplaces'))) +
+  geom_errorbar(aes(xmin = R_low, xmax = R_high, y = roundMob, colour = R_var),
+                show.legend = F, orientation = 'y') +
+  geom_point(aes(x = Rmed, y = roundMob, colour = R_var), show.legend = F) +
+  coord_cartesian(xlim = c(-0.5, 0.5), ylim = c(-100, 100)) +
+  scale_colour_manual(values = viridis(4)[1:3])+
+  geom_vline(aes(xintercept = 0), colour = 'black', size = 0.5) +
+  geom_hline(aes(yintercept = 0), colour = 'black', size = 0.5) +
+  facet_grid(cols = vars(data_type), rows = vars(R_var), scale = 'free') +
+  #facet_grid(cols = vars(continent), rows = vars(data_type), scale = 'free') +
+  labs(x = 'Change in Re', y = 'Mobility wrt. baseline\n(Europe)', 
+       colour = 'Change in Re') +
+  theme_minimal() +
+  theme(axis.text.y= element_text(size=17),
+        axis.text.x= element_text(size=17, angle = 45, hjust = 1, vjust = 1),
+        strip.text =  element_text(size=20), #, angle = 0
+        panel.spacing = unit(0.75, "lines"),
+        axis.title.y =  element_text(size=20),
+        axis.title.x =  element_text(size=20),
+        legend.title = element_text(size=20),
+        legend.text = element_text(size=17)
+  )
+Mob_plot
+plotPath <- paste0(plot_path, '/Mobdiff_Rediff_country.pdf')
+ggsave(plotPath, width = 17, height = 10)
+
+##
+library(patchwork)
+
+SI_plot + Mob_plot +
+  plot_layout(ncol =1, heights = c(3, 1), guides = 'collect') +
+  plot_annotation(tag_levels = 'A') &
+  theme(plot.tag = element_text(size = 25),
+        legend.position = 'bottom')
+
+plotPath <- paste0(plot_path, '/Mob_SI_Rediff.pdf')
+ggsave(plotPath, width = 17, height = 16)
+
+######################################################################################################################
+library(lme4)
+library(lmerTest)
+
+###########################################################
+
+SI_mod <- lmer(Rlead14 ~ SI_diff + (1|countryIso3), SI_effects)
+summary(SI_mod)
+anova(SI_mod)
+
+###########################################################
+mob_stats_df <- cleanRe %>%
+  mutate(Rpast7 = R - lag(R, 7),
+         Rlead7 = lead(R, 7) - R,
+         Rlead14 = lead(R, 14) - R) %>%
+  right_join(mob_df, by = c('countryIso3', 'date')) %>%
+  mutate(roundMob = round(mob_value, digits = -1)) %>%
+  filter(!is.na(continent), 
+         !is.na(countryIso3),
+         date <= as_date('2021-05-03')) 
+
+
+lme_mod <- lmer(Rpast7 ~ mob_value + (1|countryIso3) , mob_stats_df %>% filter(data_type == 'Workplaces') )
+summary(lme_mod)
+anova(lme_mod) # for the F value
+confint(lme_mod, oldNames = FALSE) # for the CIs
+ranef(lme_mod) # for the random effects (per country)
+plot(lme_mod)
+
+qqnorm(ranef(lme_mod)$countryIso3[,"(Intercept)"], 
+       main = "Random effects")
+qqnorm(resid(lme_mod), main = "Residuals")
+
+# new model
+lme_mod <- lmer(Rpast7 ~ mob_value:data_type + (1|continent/countryIso3), mob_stats_df)
+summary(lme_mod)
+anova(lme_mod) # for the F value
+confint(lme_mod, oldNames = FALSE) # for the CIs
+ranef(lme_mod) # for the random effects (per country)
+continent_df <- rownames_to_column(ranef(lme_mod)$countryIso3) %>%
+  separate('rowname', c('countryIso3', 'continent'), sep = ':') %>%
+   rename(#countryIso3 = rowname,
+          effect = "(Intercept)") #%>%
+  # left_join(continentData, by = 'countryIso3')
+ggplot(continent_df) +
+  geom_point(aes(x = continent, y = effect))
+
+plot(lme_mod)
+
+
+######################################################################################################################
 ## Individual oxford indices #####
 new_colnames <- c("country", "countryIso3", "date", "C1", "C1_Flag", "C2", "C2_Flag", "C3", "C3_Flag", 
                   "C4", "C4_Flag", "C5", "C5_Flag", "C6", "C6_Flag",
@@ -90,6 +298,10 @@ index_df <- oxfordGRT %>%
             .groups = 'drop') %>%
   filter(rowAny(across(ends_with('_index_diff'), ~ !is.na(.x))) )
 
+
+
+## Direct relations ####
+
 index_effects <- cleanRe %>%
   mutate(Rlead7 = lead(R, 7) - R,
          Rlead10 = lead(R, 10) - R,
@@ -107,93 +319,11 @@ index_effects <- cleanRe %>%
   filter(!is.na(countryIso3),
          !is.na(continent))
 
-## THE SI index #####
-SI_df <- oxfordGRT %>%
-  filter(is.na(RegionCode)) %>%
-  mutate(date = parse_date(Date, format = "%Y%m%d"),
-         week = isoweek(date),
-         year = year(date)) %>%
-  dplyr::select(c(country = CountryName, 
-                  countryIso3 = CountryCode,
-                  date, week, year, 
-                  SI_index = StringencyIndexForDisplay)) %>%
-  group_by(country, countryIso3) %>%
-  mutate(SI_diff = SI_index - lag(SI_index, 1)) %>%
-  group_by(country, countryIso3, week, year) %>%
-  summarise(SI_diff = sum(SI_diff, na.rm = T),
-            SI_value = SI_index[which.max(date)],
-            date = max(date),
-            .groups = 'drop')
-
-
-SI_effects <- cleanRe %>%
-  mutate(Rlead7 = lead(R, 7) - R,
-         Rlead10 = lead(R, 10) - R,
-         Rlead14 = lead(R, 14) - R) %>%
-  right_join(SI_df, by = c('countryIso3', 'date')) %>%
-  mutate(country = ifelse(!is.na(country.y), country.y, country.x) ) %>%
-  dplyr::select(-country.x, - country.y) %>%
-  mutate(roundR7 = round(Rlead7, digits = 1),
-         roundR10 = round(Rlead10, digits = 1),
-         roundR14 = round(Rlead14, digits = 1),
-         signCdiff = factor(sign(SI_diff), levels = c(-1, 0, 1))) %>%
-  filter(!is.na(continent))
-
-plotSI <- SI_effects %>% 
-  filter(!is.na(countryIso3)) %>%
-  mutate(dummy = 1,
-         roundSI = round(SI_diff, digits = -1))
-
-###########################################################
-## NPI abolishment/implementation #####
-
-SI_Rediff_plot <- function(plot_data, SI_var = 'SI_diff',
-                           group_var = 'roundSI',
-                           sign_var = 'signCdiff', R_var = 'Rlead7'){
-  
-  #plot_data <- plotSI
-  
-  p <- ggplot(plot_data ) +
-    geom_violin(aes(x = get(R_var), y = get(group_var), group = get(group_var)),
-                # outlier.shape = NA, 
-                draw_quantiles = c(0.5),
-                show.legend = T, orientation = 'y') +
-    #geom_point(aes(x = get(R_var), y = get(SI_var)), colour = 'black',
-    #         alpha = 0.2, show.legend = T) +
-    scale_colour_continuous(limits = c(-1.5, 1.5)) +
-    coord_cartesian(xlim = c(-1.5, 1.5), ylim = c(-50, 50)) +
-    geom_vline(aes(xintercept = 0), colour = 'black', size = 0.5) +
-    geom_hline(aes(yintercept = 0), colour = 'black', size = 0.5) +
-    facet_grid(cols = vars(continent), scale = 'free') +
-    labs(y = 'Change in SI', x = 'Change in Re over 7 days', 
-         #fill = 'Change in \nStringency\nIndex') +
-         colour = 'Change \nin Re') +
-    theme_minimal() +
-    theme(axis.text.y= element_text(size=17),
-          axis.text.x= element_text(size=17),
-          strip.text =  element_text(size=20), #, angle = 0
-          panel.spacing.y = unit(0.75, "lines"),
-          axis.title.y =  element_text(size=20),
-          axis.title.x =  element_text(size=20),
-          legend.title = element_text(size=20),
-          legend.text = element_text(size=17)
-    )
-  
-  plotPath <- paste0(plot_path, '/SIdiff_Rediff_distribution_country_', SI_var, '.pdf')
-  ggsave(plotPath, plot = p, width = 17, height = 10)
-  #ggsave(plotPath, plot = p, width = 12, height = 8)
-  return(p)
-}
-
-SI_Rediff_plot(plotSI, SI_var = 'SI_diff', R_var = 'Rlead7')
-
-###########################################################
-## Direct relations ####
 plot_effects <- index_effects %>%
   dplyr::select(-paste0('C', 1:8, '_index'), -paste0('sign_C', 1:8, '_index_diff'),
                 #-discreteR, -signR, 
                 -roundR7,-roundR10,-roundR14, -dummy
-                ) %>%
+  ) %>%
   pivot_longer(cols = paste0('C', 1:8, '_index_diff'), names_to = 'index', 
                values_to = 'index_change') %>%
   mutate(index_change = factor(round(index_change)))

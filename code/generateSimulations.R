@@ -406,7 +406,8 @@ get_infection_incidence_by_shift <- function(
   constant_delay_distribution,
   smooth_incidence = T,
   empirical_delays  = tibble(),
-  n_bootstrap = 5) {
+  n_bootstrap = 5,
+  days_incl = 21) {
   
   is_empirical = (nrow(empirical_delays) > 0)
   
@@ -433,7 +434,7 @@ get_infection_incidence_by_shift <- function(
     if (smooth_incidence == T) {
       smoothed_incidence_data <- time_series %>%
         complete(date = seq.Date(min(date), max(date), by = "days"), fill = list(value = 0)) %>% 
-        mutate(value = getLOESSCases(dates = date, count_data = value))
+        mutate(value = getLOESSCases(dates = date, count_data = value, days_incl = days_incl))
       
       raw_total_incidence <- sum(time_series$value, na.rm = TRUE)
       smoothed_total_incidence <- sum(smoothed_incidence_data$value, na.rm = T)
@@ -478,7 +479,7 @@ get_infection_incidence_by_shift <- function(
 # test deconvolution against "real" infection curve
 estimateInfectionTS <- function(simulation, IncubationParams, OnsetToCountParams,
                                 smooth_param = FALSE, fixed_shift = FALSE,
-                                timevarying = FALSE, n_boot = 50){
+                                timevarying = FALSE, n_boot = 50, days_incl = 21, block_size = 10){
   infection_df <- getSimIncidence(simulation)
   
   constant_delay_distributions <- list("Simulated" = get_vector_constant_waiting_time_distr(
@@ -501,7 +502,8 @@ estimateInfectionTS <- function(simulation, IncubationParams, OnsetToCountParams
       constant_delay_distribution = constant_delay_distributions[['Simulated']],
       smooth_incidence = smooth_param,
       empirical_delays  = delays_onset_to_count,
-      n_bootstrap = n_boot)
+      n_bootstrap = n_boot,
+      days_incl = days_incl)
     
   } else{
     estimatedInfections <- get_infection_incidence_by_deconvolution(
@@ -511,6 +513,8 @@ estimateInfectionTS <- function(simulation, IncubationParams, OnsetToCountParams
       constant_delay_distribution_incubation = constant_delay_distributions[["Symptoms"]],
       max_iterations = 100,
       smooth_incidence = smooth_param,
+      days_incl = days_incl,
+      block_size = block_size,
       empirical_delays = delays_onset_to_count,
       n_bootstrap = n_boot,
       verbose = FALSE)

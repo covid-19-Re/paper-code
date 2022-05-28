@@ -138,7 +138,7 @@ estimates_coverage <- estimates_firsttime %>%
 CI_subset <- estimates_coverage %>% 
   ungroup() %>%
   filter( region == "CHE", data_type == 'Confirmed cases' ) %>%
-  select(date, file_date, estimate_type, covered, ci_covered) %>%
+  dplyr::select(date, file_date, estimate_type, covered, ci_covered) %>%
   group_by(date) %>% 
   slice_min(order_by = file_date)
 
@@ -167,4 +167,4 @@ Re_plot + CI_plot +
   plot_annotation(tag_levels = 'A') & 
   theme(plot.tag = element_text(size = 30, hjust = 1, vjust = 0.5) )
 
-ggsave("../figures/Fig2.png", width = 17, height = 12)
+ggsave("../figures/Figure2.pdf", width = 17, height = 12)
